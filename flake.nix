@@ -115,6 +115,8 @@
 
                 lean4
                 elan
+
+                typst
               ]);
 
             shellHook = ''
