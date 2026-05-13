@@ -26,6 +26,21 @@
 *.stt
 *.xdy
 *.tdo
+*.aux
+*.bak*
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.synctex.gz
+*.synctex(busy)
+*.tdo
+*.toc
+_minted/
 # Generated files
 *.dvi
 *.fdb_latexmk

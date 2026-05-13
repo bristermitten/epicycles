@@ -6,22 +6,6 @@ result/
 scripts/bench_results.csv
 *.csv
 
-*.aux
-*.bak*
-*.bbl
-*.blg
-*.fdb_latexmk
-*.fls
-*.lof
-*.log
-*.lot
-*.out
-*.synctex.gz
-*.synctex(busy)
-*.tdo
-*.toc
-writing/_minted
-
 .DS_Store
 __pycache__/
 imgui.ini
