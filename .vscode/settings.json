@@ -1,0 +1,6 @@
+{
+    "cSpell.words": [
+        "Weakenable"
+    ],
+    "nixEnvSelector.nixFile": "${workspaceFolder}/flake.nix"
+}

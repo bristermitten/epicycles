@@ -1,0 +1,7 @@
+packages:
+    ./vector-dsl.cabal
+
+package dear-imgui
+  flags: +sdl +opengl3
+
+profiling: True

@@ -1,0 +1,16 @@
+cradle:
+  cabal:
+    - path: "./app/Main.hs"
+      component: "vector-dsl:exe:vector-dsl"
+
+    - path: "./app/Benchmark.hs"
+      component: "vector-dsl:exe:bench"
+
+    - path: "./app/BenchMetrics.hs"
+      component: "vector-dsl:exe:bench"
+
+    - path: "./src"
+      component: "lib:vector-dsl"
+
+    - path: "./test"
+      component: "vector-dsl:test:vector-dsl-test"

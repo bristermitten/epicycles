@@ -1,0 +1,130 @@
+cabal-version: 3.8
+name:          vector-dsl
+version:       1.0.0.2
+license:       BSD-3-Clause
+license-file:  LICENSE
+build-type:    Simple
+
+flag threaded
+  default: True
+
+common common
+  default-language:   GHC2024
+  default-extensions:
+    ImportQualifiedPost
+    OverloadedRecordDot
+    OverloadedStrings
+    PatternSynonyms
+    Strict
+
+  ghc-options:
+    -Wall -O3 -fwrite-ide-info -hiedir=.hie
+
+  mixins:
+    base hiding (Prelude),
+    base (Prelude as BasePrelude)
+
+  build-depends:
+    , base        >=4.2 && <5
+    , containers
+    , directory
+    , relude
+    , text
+
+executable vector-dsl
+  import:         common
+  hs-source-dirs: app
+  main-is:        Main.hs
+  build-depends:  vector-dsl
+
+  if flag(threaded)
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N
+
+executable bench
+  import:         common
+  hs-source-dirs: app
+  main-is:        Benchmark.hs
+  build-depends:
+    , colonnade
+    , random
+    , vector-dsl
+
+  other-modules:  BenchMetrics
+
+  if flag(threaded)
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N
+
+library
+  import:          common
+
+  -- cabal-fmt: expand src/
+  exposed-modules:
+    Alphabet
+    AST
+    AST.Instances
+    Compiler
+    Curve
+    Delta
+    Entrypoint
+    GUI.Colour
+    GUI.Config
+    GUI.ImguiCodePanel
+    GUI.ImguiInteraction
+    GUI.ImguiMain
+    GUI.ImguiRender
+    GUI.ImguiUtils
+    GUI.State
+    GUI.Types
+    GUI.Util
+    GUI.Viewport
+    Layout
+    Prelude
+    Pretty
+    PrettyAST
+    Scene
+    Unembedding
+    Unembedding.Env
+    Update.Delta
+    Update.SnS
+    Update.SnS.Common
+    Update.SnS.Heuristic
+    Update.SnS.Naive
+    Update.Types
+    Vec
+
+  hs-source-dirs:  src
+  build-depends:
+    , constraints
+    , containers
+    , dear-imgui
+    , gl
+    , managed
+    , mtl
+    , prettyprinter
+    , sdl2
+    , vector
+    , vector-th-unbox
+
+test-suite vector-dsl-test
+  import:             common
+  type:               exitcode-stdio-1.0
+  hs-source-dirs:     test
+  main-is:            Test.hs
+  ghc-options:        -threaded -rtsopts -with-rtsopts=-N
+  other-modules:
+    AmbiguityStressSpec
+    ExprShapeSpec
+    ExprUpdateSpec
+    FuseDMSpec
+    SceneSpec
+    Gen
+    Utils
+
+  build-tool-depends: sydtest-discover:sydtest-discover
+  build-depends:
+    , hedgehog
+    , mtl
+    , sydtest
+    , sydtest-discover
+    , sydtest-hedgehog
+    , vector-dsl

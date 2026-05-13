@@ -1,0 +1,47 @@
+
+\usetikzlibrary{fit}
+\begin{tikzpicture}[
+		box/.style={
+				draw=#1!80!black, fill=#1!10, rounded corners=3pt,
+				minimum height=0.9cm, minimum width=2cm,
+				align=center, font=\footnotesize\sffamily, inner sep=4pt, thick
+			},
+		arr/.style={->, >=stealth, thick, color=gray!80!black},
+		lbl/.style={font=\scriptsize\sffamily, text=gray!80!black, auto},
+		node distance=1.8cm and 2.2cm
+	]
+
+	% Top row: compilation
+	\node[box=blue] (hoas) {HOAS};
+	\node[box=blue, right=of hoas] (parsed) {Parsed AST};
+	\node[box=blue, right=of parsed] (numbered) {Numbered AST};
+
+	% Bottom row: runtime loop
+	\node[box=teal, below=2.4cm of numbered] (state) {CurveState};
+	\node[box=teal, left=of state] (scene) {VisualScene};
+	\node[box=orange, left=of scene] (canvas) {Canvas};
+
+	% Below: interaction
+	\node[box=purple, below=1.6cm of scene] (edit) {SceneEdit};
+
+	% Dashed box around the runtime loop
+	\node[draw=gray!50, dashed, rounded corners=6pt, inner sep=10pt,
+		fit=(state)(scene)(canvas)(edit),
+		label={[font=\scriptsize\sffamily, text=gray!50!black]above right:edit loop}] {};
+
+	% Compilation path
+	\draw[arr] (hoas) -- node[lbl] {runClose} (parsed);
+	\draw[arr] (parsed) -- node[lbl] {numberAST} (numbered);
+
+	% Into the loop
+	\draw[arr] (numbered) -- node[lbl] {$+$\,env} (state);
+
+	% Forward path
+	\draw[arr] (state) -- node[lbl, swap] {evalScene} (scene);
+	\draw[arr] (scene) -- node[lbl, swap] {render} (canvas);
+
+	% Backward path
+	\draw[arr] (canvas) |- node[lbl] {user drag} (edit);
+	\draw[arr] (edit) -| node[lbl, swap, pos=0.25] {backward eval} (state);
+
+\end{tikzpicture}
