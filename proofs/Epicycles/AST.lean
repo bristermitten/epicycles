@@ -12,8 +12,10 @@ inductive Expr : Nat → Type where
   | let_  : {n : Nat} → Expr n → Expr (n + 1) → Expr n
   deriving Repr
 
+/-- An epicycle id. (just a Nat, doing complex proof of existence would be too complicated for not much gain)-/
 abbrev EpicycleId := Nat
 
+/-- The curve language -/
 inductive CurveExpr (n : Nat) : Type
   | epicycle : Expr n → Expr n → Expr n → CurveExpr n
   | append   : CurveExpr n → CurveExpr n → CurveExpr n
