@@ -18,13 +18,12 @@
     date: datetime.today(),
     institution: [University of Bristol],
   ),
-  config-common(show-bibliography-as-footnote: bibliography("../writing/references.bib")),
+  // config-common(show-bibliography-as-footnote: bibliography("references.bib")),
 )
 #set heading(numbering: numbly("{1}.", default: "1.1"))
 
 #title-slide()
 
-// #outline-slide()
 
 = Introduction
 
@@ -36,7 +35,7 @@
     - Edit the output and get new code!
   #colbreak()
   #image(
-    "basic.png",
+    "images/basic.png",
   )
 ]
 
@@ -322,8 +321,8 @@ Implement and compare two different backward semantics:
     row-gutter: 1em,
     column-gutter: 1em,
     align:center,
-    image("snowflake.png", height: 35%), image("decay.png", height: 35%),
-  image("guilloche.png", height: 35%), image("asymm.png", height: 35%)
+    image("images/snowflake.png", height: 35%), image("images/decay.png", height: 35%),
+  image("images/guilloche.png", height: 35%), image("images/asymm.png", height: 35%)
   )
 ]
 
@@ -382,3 +381,7 @@ Implement and compare two different backward semantics:
 - 🔗 = 🗃️ ✅
 - 🔀 = 🧑‍🎨 🙂 + 👨‍💻😦
 - 🔺 = 🧑‍🎨 🥲 + 👨‍💻🙂
+
+= References
+
+#bibliography("references.bib", title: none)
