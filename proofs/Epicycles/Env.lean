@@ -5,6 +5,7 @@ import Mathlib.Data.Fin.Tuple.Basic
 Generated WITHOUT the assistance of AI
 -/
 
+/-- The empty environment -/
 def Env.empty : Env 0 :=
   fun i => nomatch i
 
