@@ -26,8 +26,8 @@ module Delta (
 where
 
 import AST (AST (..), ASTSort (..), BindableNum, EpicycleId, IEnv, SortVal (..))
+import ContextualEmbeddings
 import Data.List.NonEmpty qualified as NE
-import Unembedding.Env qualified as Ue
 
 {- | an 'atomic' numeric delta, i.e. "NumDelta" in the dissertation
 except composition
@@ -158,7 +158,7 @@ simplifyDelta :: EnvDelta s -> EnvDelta s
 simplifyDelta (EDNum d) = EDNum (simplifyNumDelta d)
 
 -- | the type of the delta environment
-type DeltaEnv = Ue.Env EnvDelta
+type DeltaEnv = Env EnvDelta
 
 -- | Embed (or more specifically the `exp` function) a delta into the AST
 embedANumDelta :: (BindableNum n) => AtomicNumDelta n -> AST x env (SNum n) -> AST x env (SNum n)
@@ -209,19 +209,19 @@ splitNumSuffix d1 d2 =
     mk = maybe NumDeltaId ComposeNumDeltas . nonEmpty
 
 applyDeltaEnv :: DeltaEnv env -> IEnv env -> IEnv env
-applyDeltaEnv Ue.ENil Ue.ENil = Ue.ENil
-applyDeltaEnv (Ue.ECons d restD) (Ue.ECons v restV) =
+applyDeltaEnv ENil ENil = ENil
+applyDeltaEnv (ECons d restD) (ECons v restV) =
     let newV = case (d, v) of
             (EDNum numD, VNum val) -> VNum (applyNumDelta numD val)
         restV' = applyDeltaEnv restD restV
-     in Ue.ECons newV restV'
+     in ECons newV restV'
 
 {- | makes a 'DeltaEnv' which matches the shape of the given 'IEnv', but with all 'Delta's set to identity (i.e. no change)
 essentially the "zero" delta environment for a given environment length
 -}
 zeroDeltas :: IEnv env -> DeltaEnv env
-zeroDeltas Ue.ENil = Ue.ENil
-zeroDeltas (Ue.ECons val rest) = Ue.ECons (toId val) (zeroDeltas rest)
+zeroDeltas ENil = ENil
+zeroDeltas (ECons val rest) = ECons (toId val) (zeroDeltas rest)
 
 -- | Convert a 'SortVal' to the corresponding identity 'EnvDelta' for that sort
 toId :: SortVal s -> EnvDelta s

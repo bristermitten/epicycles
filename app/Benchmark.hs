@@ -9,6 +9,7 @@ module Main (main) where
 import AST (CurveState (..), EpicycleId (..), approxEq)
 import BenchMetrics (BenchScene (..), astNodeCount, benchScenes)
 import Colonnade
+import ContextualEmbeddings
 import Data.Foldable (maximum, minimum)
 import Data.List ((!!))
 import Data.List.NonEmpty qualified as NE (filter, reverse)
@@ -179,7 +180,7 @@ runLockstep scenarioName seed scene specs =
         let stepped = map (advance scenarioName scene seed i spec) states
          in map snd stepped <> go (i + 1) (map fst stepped) rest
 
-advance :: ScenarioId -> BenchScene -> Int -> Int -> EditSpec -> (AnyBenchStrategy '[], CurveState '[]) -> ((AnyBenchStrategy '[], CurveState '[]), BenchRow)
+advance :: ScenarioId -> BenchScene -> Int -> Int -> EditSpec -> (AnyBenchStrategy Empty, CurveState Empty) -> ((AnyBenchStrategy Empty, CurveState Empty), BenchRow)
 advance scenarioName scene seed i spec (AnyBenchStrategy strat, cs) =
     case bsApply strat edit cs of
         Nothing ->
@@ -290,7 +291,7 @@ putPutDisagreement targetEid s1 s2 =
         otherDiff = length [() | (eid, eq) <- diffs, eid /= targetEid, not eq]
      in (tgtDiff, otherDiff)
 
-ppRunOne :: BenchScene -> AnyBenchStrategy '[] -> Int -> EpicycleParam -> (Double, Double) -> PPRow
+ppRunOne :: BenchScene -> AnyBenchStrategy Empty -> Int -> EpicycleParam -> (Double, Double) -> PPRow
 ppRunOne scene (AnyBenchStrategy strat) epiIdx param (v1, v2) =
     let eid = toList scene.bsEpicycleIds !! epiIdx
         s0 = bsState scene

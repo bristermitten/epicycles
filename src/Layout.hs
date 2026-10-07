@@ -1,11 +1,12 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 
--- | simple layout system for arranging multiple curves on the screen.
--- we don't use this much, and it was mainly designed as a quick fix to help with designing the poster.
--- the only remaining use is in the Entrypoint.layoutWordScene function which uses it to space glyphs
--- it's also not that relevant to our thesis, as unlike everything else this is only unidirectional with no editing support
--- as such, we don't mention it in the dissertation, however it's left as a reference and example of where future work could go.
+{- | simple layout system for arranging multiple curves on the screen.
+we don't use this much, and it was mainly designed as a quick fix to help with designing the poster.
+the only remaining use is in the Entrypoint.layoutWordScene function which uses it to space glyphs
+it's also not that relevant to our thesis, as unlike everything else this is only unidirectional with no editing support
+as such, we don't mention it in the dissertation, however it's left as a reference and example of where future work could go.
+-}
 module Layout (
     Layout (..),
     beside,

@@ -11,7 +11,7 @@ import GHC.Num (fromInteger)
 import GHC.Real qualified
 import Numeric (log)
 
-instance {-# INCOHERENT #-} (Expr e) => Num (e (SNum Double)) where
+instance {-# INCOHERENT #-} (Expr e) => Num (e env (SNum Double)) where
     (+) = add
     (*) = mul
     negate = mul (lit (-1))
@@ -19,7 +19,7 @@ instance {-# INCOHERENT #-} (Expr e) => Num (e (SNum Double)) where
     signum _ = error "signum is not implemented for Expr"
     fromInteger n = lit (GHC.Num.fromInteger n)
 
-instance {-# INCOHERENT #-} (Expr e) => Num (e (SNum Int)) where
+instance {-# INCOHERENT #-} (Expr e) => Num (e env (SNum Int)) where
     (+) = add
     (*) = mul
     negate = mul (lit (-1))
@@ -27,7 +27,7 @@ instance {-# INCOHERENT #-} (Expr e) => Num (e (SNum Int)) where
     signum _ = error "signum is not implemented for Expr"
     fromInteger n = lit (GHC.Num.fromInteger n)
 
-instance {-# INCOHERENT #-} (Expr e) => Num (e (SNum Rational)) where
+instance {-# INCOHERENT #-} (Expr e) => Num (e env (SNum Rational)) where
     (+) = add
     (*) = mul
     negate = mul (lit (-1))
@@ -35,15 +35,15 @@ instance {-# INCOHERENT #-} (Expr e) => Num (e (SNum Rational)) where
     signum _ = error "signum is not implemented for Expr"
     fromInteger n = lit (GHC.Num.fromInteger n)
 
-instance {-# INCOHERENT #-} (Expr e) => Fractional (e (SNum Double)) where
+instance {-# INCOHERENT #-} (Expr e) => Fractional (e env (SNum Double)) where
     recip = AST.recip
     fromRational r = lit (GHC.Real.fromRational r)
 
-instance {-# INCOHERENT #-} (Expr e) => Fractional (e (SNum Rational)) where
+instance {-# INCOHERENT #-} (Expr e) => Fractional (e env (SNum Rational)) where
     recip = AST.recip
     fromRational = lit
 
-instance {-# INCOHERENT #-} (Expr e) => Floating (e (SNum Rational)) where
+instance {-# INCOHERENT #-} (Expr e) => Floating (e env (SNum Rational)) where
     pi = lit (toRational (pi :: Double))
     exp = error "exp is not implemented for Expr"
     log = error "log is not implemented for Expr"

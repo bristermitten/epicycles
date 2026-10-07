@@ -33,14 +33,11 @@ module AST (
 )
 where
 
+import ContextualEmbeddings
 import GUI.Util (showFixed, showRational)
 import Pretty (PrettyCurve (pretty, prettyPrec), SyntaxHighlight (..), annotate)
 import Prettyprinter (Doc)
 import Prettyprinter qualified as PP
-import Unembedding
-import Unembedding qualified as Ue
-import Unembedding.Env (Env (..), Ix, lookEnv)
-import Unembedding.Env qualified as Ue
 
 -- | singleton type thing to mark whether an ast node is a number or a curve
 type data ASTSort = SNum Type | SCurve
@@ -52,23 +49,22 @@ data SortVal (s :: ASTSort) where
 
 deriving instance Show (SortVal s)
 
-type IEnv = Ue.Env SortVal
+type IEnv = Env SortVal
 
 data CurveState env = CurveState
     { curveAST :: AST Numbered env SCurve
     , envParams :: IEnv env
     }
-    deriving (Show)
-
-    
+deriving instance Show (CurveState env)
 
 -- | Class for approximate equality of values
 class ApproxEq a where
     approxEq :: a -> a -> Bool
 
 instance ApproxEq Double where
-    approxEq a b = abs (a - b) < 1e-5 * max 1 (abs a) 
-    -- the choice of 1e-5 is a bit arbitrary and maybe not very principled but seems to work well in practice
+    approxEq a b = abs (a - b) < 1e-5 * max 1 (abs a)
+
+-- the choice of 1e-5 is a bit arbitrary and maybe not very principled but seems to work well in practice
 
 instance ApproxEq Int where
     approxEq = (==)
@@ -113,12 +109,17 @@ type family XEpicycle (p :: Stage) where
     XEpicycle Parsed = ()
     XEpicycle Numbered = EpicycleId
 
+{- | A Trees-That-Grow style tag to prevent curves from being bound
+Note that after moving from Embedding by Unembedding to Contextual Embeddings
+this isn't quite as necessary, as we know curves can never be bound.
+In the future it might be worth relaxing this so that curves from the environment _can_ be accessed
+-}
 type family XParam (s :: ASTSort) where
     XParam SCurve = Void -- we can never bind curves
     XParam (SNum n) = ()
 
 -- | De-Bruijn indexed concrete syntax for expressions.
-data AST (x :: Stage) (env :: [ASTSort]) (s :: ASTSort) where
+data AST (x :: Stage) (env :: Ctx ASTSort) (s :: ASTSort) where
     -- | A literal value
     Lit :: (BindableNum n) => n -> AST x env (SNum n)
     -- | Reference a variable / parameter from the environment
@@ -134,36 +135,29 @@ data AST (x :: Stage) (env :: [ASTSort]) (s :: ASTSort) where
     -- | Append two curves together
     Append :: AST x env SCurve -> AST x env SCurve -> AST x env SCurve
     -- | Let-binding
-    Let :: (Typeable n, BindableNum n) => AST x env (SNum n) -> AST x (SNum n : env) a -> AST x env a
+    Let :: (Typeable n, BindableNum n) => AST x env (SNum n) -> AST x (env :/: SNum n) a -> AST x env a
 
 pattern Param :: (XParam s ~ ()) => Ix env s -> AST x env s
 pattern Param ix = Param_ () ix
 
 {-# COMPLETE Lit, Param, Add, Mul, Recip, Epicycle, Append, Let #-}
 
-instance LiftVariables (AST Parsed) where
-    type Var (AST Parsed) = Ix
-    type LiftConstraint (AST Parsed) s = (XParam s ~ ())
-    liftVar = Param
+instance Expr (AST Parsed) where
+    lit = Lit
+    add = Add
+    mul = Mul
+    recip = Recip
+    let_ ::
+        forall env n a.
+        (Typeable n, BindableNum n) =>
+        AST Parsed env (SNum n) ->
+        ((forall use. (ReifyIndex (env :/: SNum n) use) => AST Parsed use (SNum n)) -> AST Parsed (env :/: SNum n) a) ->
+        AST Parsed env a
+    let_ v k = Let v (k (Param (safeProxyTop @env @(SNum n))))
 
-instance Expr (EnvI (AST Parsed)) where
-    lit x = liftFO0 (Lit x)
-    add = liftFO2 Add
-    mul = liftFO2 Mul
-    recip = liftFO1 Recip
-
-    let_ =
-        liftSOn
-            @(AST Parsed)
-            (ol0 @(AST Parsed) :. ol1 @(AST Parsed) :. ENil)
-            Let
-
-instance CurveExpr (EnvI (AST Parsed)) where
-    epicycle = liftFO3 (Epicycle ())
-    cappend = liftFO2 Append
-
-liftFO3 :: (forall env. sem env a -> sem env b -> sem env c -> sem env d) -> EnvI sem a -> EnvI sem b -> EnvI sem c -> EnvI sem d
-liftFO3 f x y z = liftFO (\(ECons xx (ECons yy (ECons zz _))) -> f xx yy zz) (ECons x (ECons y (ECons z ENil)))
+instance CurveExpr (AST Parsed) where
+    epicycle = Epicycle ()
+    cappend = Append
 
 -- | Data-less tag for a curve used for type safety in GADTs
 data Curve deriving (Show, Eq)
@@ -174,9 +168,8 @@ newtype EpicycleId = EpicycleId Int deriving (Show, Eq, Ord)
 instance PrettyCurve EpicycleId where
     prettyPrec _ (EpicycleId n) = pretty 'e' <> pretty n
 
-{- | Uniquely number the epicycles in a curve AST, producing a 'Numbered' AST
--}
-numberAST :: AST Parsed '[] SCurve -> State EpicycleId (AST Numbered '[] SCurve)
+-- | Uniquely number the epicycles in a curve AST, producing a 'Numbered' AST
+numberAST :: AST Parsed Empty SCurve -> State EpicycleId (AST Numbered Empty SCurve)
 numberAST = go
   where
     go :: AST Parsed env SCurve -> State EpicycleId (AST Numbered env SCurve)
@@ -200,12 +193,12 @@ numberAST = go
     goVal (Recip a) = Recip <$> goVal a
     goVal (Let val body) = Let <$> goVal val <*> goVal body
 
-instance {-# INCOHERENT #-} (CurveExpr e) => Semigroup (e SCurve) where
+instance {-# INCOHERENT #-} (CurveExpr e) => Semigroup (e env SCurve) where
     (<>) = cappend
 
-numberCurve :: (forall e. (CurveExpr e) => e SCurve) -> AST Numbered '[] SCurve
+numberCurve :: (forall e env. (CurveExpr e) => e env SCurve) -> AST Numbered Empty SCurve
 numberCurve term =
-    let ast :: AST Parsed '[] SCurve = Ue.runClose term
+    let ast :: AST Parsed Empty SCurve = term
      in numberAST ast `evalState` EpicycleId 0
 
 evalExpr :: IEnv env -> AST phase env (SNum n) -> n
@@ -258,16 +251,22 @@ evalEpiParams env ast eid =
         <*> evalEpiParam SPhase eid env ast
 
 -- | HOAS representation of expressions.
-class Expr (e :: ASTSort -> Type) where
-    lit :: (BindableNum n) => n -> e (SNum n)
-    add :: (BindableNum n) => e (SNum n) -> e (SNum n) -> e (SNum n)
-    mul :: (BindableNum n) => e (SNum n) -> e (SNum n) -> e (SNum n)
-    recip :: (BindableNum n, Fractional n) => e (SNum n) -> e (SNum n)
-    let_ :: (Typeable n, BindableNum n) => e (SNum n) -> (e (SNum n) -> e a) -> e a
+class Expr (e :: Ctx ASTSort -> ASTSort -> Type) where
+    lit :: (BindableNum n) => n -> e env (SNum n)
+    add :: (BindableNum n) => e env (SNum n) -> e env (SNum n) -> e env (SNum n)
+    mul :: (BindableNum n) => e env (SNum n) -> e env (SNum n) -> e env (SNum n)
+    recip :: (BindableNum n, Fractional n) => e env (SNum n) -> e env (SNum n)
+    let_ ::
+        (Typeable n, BindableNum n) =>
+        e env (SNum n) ->
+        ( (forall use. (ReifyIndex (env :/: SNum n) use) => e use (SNum n)) ->
+          e (env :/: SNum n) a
+        ) ->
+        e env a
 
 class (Expr e) => CurveExpr e where
-    epicycle :: e (SNum Rational) -> e (SNum Int) -> e (SNum Rational) -> e SCurve
-    cappend :: e SCurve -> e SCurve -> e SCurve
+    epicycle :: e env (SNum Rational) -> e env (SNum Int) -> e env (SNum Rational) -> e env SCurve
+    cappend :: e env SCurve -> e env SCurve -> e env SCurve
 
 deriving instance (Show (XEpicycle x), Show (XParam s)) => Show (AST x env s)
 

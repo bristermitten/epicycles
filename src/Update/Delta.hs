@@ -14,9 +14,9 @@ module Update.Delta (
 where
 
 import AST (AST (..), ASTSort (..), BindableNum (safeDiv), CurveState (..), IEnv, ShowAST, SortVal (VNum), Stage (Numbered), evalExpr)
+import ContextualEmbeddings
 import Control.Monad.Writer
 import Delta
-import Unembedding.Env qualified as Ue
 
 -- | Information about a conflict that was encountered during the merge process, for logging and debugging purposes
 data Conflict = ConflictLog
@@ -61,9 +61,9 @@ backwardEvalNum d _env deltaEnv (Lit n) =
 -- applying a delta to a parameter creates a new parameter with the updated value
 -- i.e. P-Var
 backwardEvalNum d _varEnv deltaEnv (Param_ p ix) =
-    let EDNum existingDelta = Ue.lookEnv deltaEnv ix
+    let EDNum existingDelta = lookEnv deltaEnv ix
         composedDelta = d <> existingDelta
-        env' = Ue.setIx ix (EDNum composedDelta) deltaEnv
+        env' = setIx ix (EDNum composedDelta) deltaEnv
      in pure (env', Param_ p ix)
 -- A-Repl
 backwardEvalNum ((NumDeltaReplace n)) vals _E _e =
@@ -126,10 +126,10 @@ backwardEvalNum dv@((NumDeltaMul _)) vals deltas e@(Add x y) = do
 -- D-Let
 backwardEvalNum dv vals deltas e@(Let e1 o) = do
     let v1 = evalExpr vals e1 -- sigma |- e1 ⇓ v1
-        valsBody = Ue.ECons (VNum v1) vals -- sigma, v1 |- body (not in the official rule)
-        paddedDelta = Ue.ECons (EDNum NumDeltaId) deltas -- Delta[x ↦ id]
+        valsBody = ECons (VNum v1) vals -- sigma, v1 |- body (not in the official rule)
+        paddedDelta = ECons (EDNum NumDeltaId) deltas -- Delta[x ↦ id]
     (envBody', o') <- backwardEvalNum dv valsBody paddedDelta o -- Delta[x ↦ id] |- dv <| o ~> ((Delta_body, dv_x), o')
-    let Ue.ECons (EDNum dv_x) _DeltaBody = envBody' -- (Delta_body, dv_x)
+    let ECons (EDNum dv_x) _DeltaBody = envBody' -- (Delta_body, dv_x)
     (_DeltaVal, e1') <- backwardEvalNum dv_x vals deltas e1 -- Delta |- dv_x <| e_1 ~> (Delta_val, e1')
 
     -- <Delta_val, e1'> ▷◁ <Delta_body, o'> ~> (Delta^M, e1'', o'')
@@ -213,10 +213,10 @@ backwardEvalCurve ((CurveDeltaAppend dL dR)) vals deltas e@(Append c1 c2) = do
 -- D-Let (again)
 backwardEvalCurve dv vals deltas e@(Let e1 o) = do
     let v1 = evalExpr vals e1 -- sigma |- e1 ⇓ v1
-        valsBody = Ue.ECons (VNum v1) vals -- sigma, v1 |- body
-        paddedDelta = Ue.ECons (EDNum NumDeltaId) deltas -- Delta[x ↦ id]
+        valsBody = ECons (VNum v1) vals -- sigma, v1 |- body
+        paddedDelta = ECons (EDNum NumDeltaId) deltas -- Delta[x ↦ id]
     (envBody', o') <- backwardEvalCurve dv valsBody paddedDelta o -- Delta[x ↦ id] |- dv <| o ~> ((Delta_body, dv_x), o')
-    let Ue.ECons (EDNum dv_x) _DeltaBody = envBody' -- (Delta_body, dv_x)
+    let ECons (EDNum dv_x) _DeltaBody = envBody' -- (Delta_body, dv_x)
     (_DeltaVal, e1') <- backwardEvalNum dv_x vals deltas e1 -- Delta |- dv_x <| e_1 ~> (Delta_val, e1')
 
     -- <Delta_val, e1'> ▷◁ <Delta_body, o'> ~> (Delta^M, e1'', o'')
@@ -263,12 +263,12 @@ optimisedMergeLet ::
     DeltaEnv as1 -> -- Delta_val
     DeltaEnv as1 -> -- Delta_body
     AST Numbered as1 s1 -> -- e1'
-    AST Numbered (SNum n : as1) s2 -> -- o'
-    InnerDeltaM (DeltaEnv as1, AST Numbered as1 s1, AST Numbered (SNum n : as1) s2)
+    AST Numbered (as1 :/: SNum n) s2 -> -- o'
+    InnerDeltaM (DeltaEnv as1, AST Numbered as1 s1, AST Numbered (as1 :/: SNum n) s2)
 optimisedMergeLet _Delta_val _Delta_body e1 e2 = do
-    (eM, e1I, e2I) <- compareOperator _Delta_val _Delta_body (`isFreeIn` e1) (\ix -> isFreeIn (Ue.IxS ix) e2)
+    (eM, e1I, e2I) <- compareOperator _Delta_val _Delta_body (`isFreeIn` e1) (\ix -> isFreeIn (IxS ix) e2)
     let e1' = embeddingOperator e1I e1
-        paddedEnv = Ue.ECons (EDNum NumDeltaId) e2I
+        paddedEnv = ECons (EDNum NumDeltaId) e2I
         e2' = embeddingOperator paddedEnv e2
 
     pure (eM, e1', e2')
@@ -277,8 +277,8 @@ compareOperator ::
     forall env.
     DeltaEnv env -> -- E_1
     DeltaEnv env -> -- E_2
-    (forall val. Ue.Ix env val -> Bool) -> -- isFreeIn left branch
-    (forall val. Ue.Ix env val -> Bool) -> -- isFreeIn right branch
+    (forall val. Ix env val -> Bool) -> -- isFreeIn left branch
+    (forall val. Ix env val -> Bool) -> -- isFreeIn right branch
 
     -- | (ConflictInfo, MergedEnv, LeftConflicts, RightConflicts)
     InnerDeltaM (DeltaEnv env, DeltaEnv env, DeltaEnv env)
@@ -290,12 +290,12 @@ compareOperator env1 env2 isFree1 isFree2 =
         forall sub.
         DeltaEnv sub ->
         DeltaEnv sub ->
-        (forall val. Ue.Ix sub val -> Ue.Ix env val) ->
+        (forall val. Ix sub val -> Ix env val) ->
         InnerDeltaM (DeltaEnv sub, DeltaEnv sub, DeltaEnv sub)
-    go Ue.ENil Ue.ENil _ = pure (Ue.ENil, Ue.ENil, Ue.ENil) -- base case: both environments empty
-    go (Ue.ECons d1 rest1) (Ue.ECons d2 rest2) liftIx = do
-        let ix = liftIx Ue.IxZ
-        (eM, e1I, e2I) <- go rest1 rest2 (liftIx . Ue.IxS)
+    go ENil ENil _ = pure (ENil, ENil, ENil) -- base case: both environments empty
+    go (ECons d1 rest1) (ECons d2 rest2) liftIx = do
+        let ix = liftIx IxZ
+        (eM, e1I, e2I) <- go rest1 rest2 (liftIx . IxS)
         let
             -- cases 1 and 2 have the same result
             -- if dv1 = dv2 and if 𝑥 ∉ fv(𝑒2)
@@ -304,18 +304,18 @@ compareOperator env1 env2 isFree1 isFree2 =
             if case1Or2
                 then
                     pure
-                        ( d1 `Ue.ECons` eM
-                        , idDelta d1 `Ue.ECons` e1I
-                        , idDelta d2 `Ue.ECons` e2I
+                        ( d1 `ECons` eM
+                        , idDelta d1 `ECons` e1I
+                        , idDelta d2 `ECons` e2I
                         )
                 -- if 𝑥 ∉ fv(𝑒1)
                 else
                     if not (isFree1 ix)
                         then
                             pure
-                                ( d2 `Ue.ECons` eM
-                                , idDelta d1 `Ue.ECons` e1I
-                                , idDelta d2 `Ue.ECons` e2I
+                                ( d2 `ECons` eM
+                                , idDelta d1 `ECons` e1I
+                                , idDelta d2 `ECons` e2I
                                 )
                         else do
                             -- conflict case
@@ -323,12 +323,12 @@ compareOperator env1 env2 isFree1 isFree2 =
                             let (dv', dv1', dv2') = longestCommonSuffix d1 d2
                                 suffixLen = sizeOfDelta dv'
                                 resType = if suffixLen > 0 then CleanSuffixSplit else TotalDisagreement
-                                newLog = ConflictLog (Ue.ixToInt ix) (show d1) (show d2) suffixLen nodeName resType
+                                newLog = ConflictLog (ixToInt ix) (show d1) (show d2) suffixLen nodeName resType
                             tell [newLog]
                             pure
-                                ( dv' `Ue.ECons` eM
-                                , dv1' `Ue.ECons` e1I
-                                , dv2' `Ue.ECons` e2I
+                                ( dv' `ECons` eM
+                                , dv1' `ECons` e1I
+                                , dv2' `ECons` e2I
                                 )
 
 {- | e' = E^I ⊙ e
@@ -344,7 +344,7 @@ embeddingOperator ::
     AST Numbered env s
 embeddingOperator _ (Lit n) = Lit n
 embeddingOperator env (Param_ p ix) =
-    let delta = Ue.lookEnv env ix
+    let delta = lookEnv env ix
      in case delta of
             EDNum numDelta ->
                 embedNumDelta numDelta (Param_ p ix)
@@ -355,22 +355,22 @@ embeddingOperator env (Append c1 c2) = Append (embeddingOperator env c1) (embedd
 embeddingOperator env (Epicycle eid r w p) = Epicycle eid (embeddingOperator env r) (embeddingOperator env w) (embeddingOperator env p)
 embeddingOperator env (Let e1 o) =
     let e1' = embeddingOperator env e1
-        envForBody = Ue.ECons (EDNum NumDeltaId) env
+        envForBody = ECons (EDNum NumDeltaId) env
         o' = embeddingOperator envForBody o
      in Let e1' o'
 
 {- | checks if a parameter is free in an expression
 since we only allow closed terms, this means _locally_ free
 -}
-isFreeIn :: Ue.Ix env s -> AST Numbered env s2 -> Bool
+isFreeIn :: Ix env s -> AST Numbered env s2 -> Bool
 isFreeIn _ix (Lit _) = False
-isFreeIn ix (Param_ _ ix') = Ue.ixToWord ix == Ue.ixToWord ix'
+isFreeIn ix (Param_ _ ix') = ixToInt ix == ixToInt ix'
 isFreeIn ix (Add e1 e2) = isFreeIn ix e1 || isFreeIn ix e2
 isFreeIn ix (Mul e1 e2) = isFreeIn ix e1 || isFreeIn ix e2
 isFreeIn ix (Recip e) = isFreeIn ix e
 isFreeIn ix (Append c1 c2) = isFreeIn ix c1 || isFreeIn ix c2
 isFreeIn ix (Epicycle _eid r w p) = isFreeIn ix r || isFreeIn ix w || isFreeIn ix p
-isFreeIn ix (Let e1 o) = isFreeIn ix e1 || isFreeIn (Ue.IxS ix) o
+isFreeIn ix (Let e1 o) = isFreeIn ix e1 || isFreeIn (IxS ix) o
 
 fuseDMBackward ::
     (ShowAST SCurve) =>

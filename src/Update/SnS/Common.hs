@@ -8,7 +8,8 @@ import AST
 import Data.Typeable
 import Pretty (PrettyCurve (..))
 import PrettyAST
-import Unembedding.Env qualified as Ue
+
+import ContextualEmbeddings (Ctx (..), Env (..))
 import Update.Types
 
 -- | information about a backwards update under this algorithm
@@ -48,14 +49,14 @@ instance Ord EditDepth where
     compare d1 d2 = compare (editDepthCost d1) (editDepthCost d2)
 
 -- | class for environments that can be compared for differences
-class DiffEnv (env :: [ASTSort]) where
-    diffEnv :: Int -> Ue.Env SortVal env -> Ue.Env SortVal env -> EditDepth
+class DiffEnv (env :: Ctx ASTSort) where
+    diffEnv :: Int -> Env SortVal env -> Env SortVal env -> EditDepth
 
-instance DiffEnv '[] where
-    diffEnv _ Ue.ENil Ue.ENil = NoEdit
+instance DiffEnv Empty where
+    diffEnv _ ENil ENil = NoEdit
 
-instance (DiffEnv rest, ApproxEq n) => DiffEnv (SNum n ': rest) where
-    diffEnv d (Ue.ECons (VNum v1) rest1) (Ue.ECons (VNum v2) rest2)
+instance (DiffEnv rest, ApproxEq n) => DiffEnv (rest :/: SNum n) where
+    diffEnv d (ECons (VNum v1) rest1) (ECons (VNum v2) rest2)
         | approxEq v1 v2 = diffEnv (d + 1) rest1 rest2
         | otherwise =
             max
@@ -98,7 +99,7 @@ instance PrettyCurve (UpdateResult phase env (SNum n)) where
 rankResult ::
     (ApproxEq n, DiffEnv env) =>
     AST phase env (SNum n) ->
-    Ue.Env SortVal env ->
+    Env SortVal env ->
     UpdateResult phase env (SNum n) ->
     EditDepth
 rankResult oldExpr oldEnv (UpdateResult newExpr newEnv) =
@@ -148,8 +149,8 @@ genericCurveUpdate strategy epicycleId target state = do
                 Nothing -> Nothing
     go (Let (val :: AST Numbered innerEnv (SNum n)) body) env = do
         let v = evalExpr env val -- eval v
-            extendedEnv = Ue.ECons (VNum v) env -- bind to env
-        (body', Ue.ECons (VNum wantedV) outerFromBody, info) <- go body extendedEnv -- update body
+            extendedEnv = ECons (VNum v) env -- bind to env
+        (body', ECons (VNum wantedV) outerFromBody, info) <- go body extendedEnv -- update body
         case strategy outerFromBody val wantedV of
             Nothing -> Just (Let (Lit wantedV) body', outerFromBody, info)
             Just (UpdateResult val' outerFinal, info') -> do

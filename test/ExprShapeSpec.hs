@@ -1,10 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-
--- | this proves the structural invariance of the SnS update algorithm:
--- that is, the shape of the AST is preserved by updates, and only the literal values change.
--- this is sort of an obvious property - the construction of the semantics literally cannot do this.
--- however there is no proof of this in the type system, and so this serves as an extra sanity check / bug catcher
+{- | this proves the structural invariance of the SnS update algorithm:
+that is, the shape of the AST is preserved by updates, and only the literal values change.
+this is sort of an obvious property - the construction of the semantics literally cannot do this.
+however there is no proof of this in the type system, and so this serves as an extra sanity check / bug catcher
+-}
 module ExprShapeSpec (spec) where
 
 import AST
@@ -13,11 +13,12 @@ import Hedgehog (Property, discover, forAll, property, (===))
 import Hedgehog qualified as H
 import Test.Syd
 import Test.Syd.Hedgehog (fromHedgehogGroup)
-import Unembedding.Env qualified as Ue
+
+import ContextualEmbeddings
 import Update.SnS
 import Update.SnS.Heuristic
-import Prelude
 import Utils
+import Prelude
 
 spec :: Spec
 spec = fromHedgehogGroup $$discover
@@ -46,7 +47,7 @@ prop_updatePreservesShape = property $ do
     expr <- forAll genClosedExpr
     target <- forAll genFinite
 
-    case bestUpdate Ue.ENil expr target of
+    case bestUpdate ENil expr target of
         Nothing -> H.discard -- assuming the update actually exists
         Just updated ->
             exprShape expr === exprShape updated.updatedExpr

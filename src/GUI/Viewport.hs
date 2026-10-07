@@ -52,8 +52,7 @@ worldPosDistSquared :: WorldPos -> WorldPos -> Double
 worldPosDistSquared (WorldPos v1) (WorldPos v2) =
     Vec.distSquared v1 v2
 
-{- | Convert a screen position to world coordinates
--}
+-- | Convert a screen position to world coordinates
 localCoords :: CanvasRegion -> ViewTransform -> ScreenPos -> Vec
 localCoords region vt pos =
     let WorldPos v = screenToLocal region vt pos in v

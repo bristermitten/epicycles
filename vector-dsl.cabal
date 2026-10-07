@@ -17,9 +17,7 @@ common common
     PatternSynonyms
     Strict
 
-  ghc-options:
-    -Wall -O3 -fwrite-ide-info -hiedir=.hie
-
+  ghc-options:        -Wall -O3 -fwrite-ide-info -hiedir=.hie
   mixins:
     base hiding (Prelude),
     base (Prelude as BasePrelude)
@@ -63,6 +61,7 @@ library
     AST
     AST.Instances
     Compiler
+    ContextualEmbeddings
     Curve
     Delta
     Entrypoint
@@ -82,8 +81,6 @@ library
     Pretty
     PrettyAST
     Scene
-    Unembedding
-    Unembedding.Env
     Update.Delta
     Update.SnS
     Update.SnS.Common
@@ -116,8 +113,8 @@ test-suite vector-dsl-test
     ExprShapeSpec
     ExprUpdateSpec
     FuseDMSpec
-    SceneSpec
     Gen
+    SceneSpec
     Utils
 
   build-tool-depends: sydtest-discover:sydtest-discover

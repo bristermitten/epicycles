@@ -12,9 +12,9 @@ module PrettyAST (
 where
 
 import AST (AST (..), ASTSort (..), BindableNum (prettyLit), CurveExpr, CurveState (..), EpicycleId, EpicycleParam (..), IEnv, Numbered, SortVal (..), evalExpr, numberCurve)
+import ContextualEmbeddings
 import Pretty (PrettyCurve (..), SyntaxHighlight (..), annotate, (<+>))
 import Prettyprinter qualified as PP
-import Unembedding.Env qualified as Ue
 
 -- | What part of the code is being hovered or dragged, for syntax highlighting purposes
 data CodeFocus
@@ -35,14 +35,14 @@ prettyNumbered focus depth env = ppNumberedPrec focus depth env precTop
 prettyCurveState :: CodeFocus -> CurveState env -> PP.Doc SyntaxHighlight
 prettyCurveState focus cs = prettyNumbered focus 0 cs.envParams cs.curveAST
 
-prettyClosedCurve :: (forall e. (CurveExpr e) => e SCurve) -> PP.Doc SyntaxHighlight
-prettyClosedCurve term = prettyCurveState CFNone (CurveState (numberCurve term) Ue.ENil)
+prettyClosedCurve :: (forall e env. (CurveExpr e) => e env SCurve) -> PP.Doc SyntaxHighlight
+prettyClosedCurve term = prettyCurveState CFNone (CurveState (numberCurve term) ENil)
 
 ppExprPrec :: Int -> IEnv env -> Int -> AST phase env (SNum v) -> PP.Doc SyntaxHighlight
 ppExprPrec _depth _env _p (Lit d) =
     annotate HLLiteral (prettyLit d)
 ppExprPrec depth _env _p (Param_ _ idx) =
-    annotate HLParam ("x" <> PP.pretty (depth - 1 - Ue.ixToInt idx))
+    annotate HLParam ("x" <> PP.pretty (depth - 1 - ixToInt idx))
 ppExprPrec depth env p (Add a b) =
     parensIf (p > precAdd) $
         ppExprPrec depth env precAddL a
@@ -69,7 +69,7 @@ ppExprPrec depth env p (Let val body) =
                 <> PP.hardline
                 <> ppExprPrec
                     (depth + 1)
-                    (Ue.ECons (VNum (evalExpr env val)) env)
+                    (ECons (VNum (evalExpr env val)) env)
                     precTop
                     body
 
@@ -78,7 +78,7 @@ ppNumberedPrec :: CodeFocus -> Int -> IEnv env -> Int -> AST Numbered env SCurve
 ppNumberedPrec focus depth env p (Let valExpr body) =
     let varName = annotate HLVariable ("x" <> PP.pretty depth)
         val = evalExpr env valExpr
-        bodyEnv = Ue.ECons (VNum val) env
+        bodyEnv = ECons (VNum val) env
      in parensIf (p > precLet) $
             annotate HLKeyword "let"
                 <+> varName
@@ -115,7 +115,6 @@ ppNumberedPrec focus depth env p (Append a b) =
             <> PP.hardline
             <> annotate HLOperator "<>"
                 <+> ppNumberedPrec focus depth env precAppendR b
-
 
 precTop :: Int
 precTop = -1
@@ -160,7 +159,6 @@ precRecipArg = 7
 parensIf :: Bool -> PP.Doc a -> PP.Doc a
 parensIf True = PP.parens
 parensIf False = id
-
 
 -- we have to use an orphan here because otherwise we have cyclic dependency between this and AST
 instance PrettyCurve (CurveState env) where

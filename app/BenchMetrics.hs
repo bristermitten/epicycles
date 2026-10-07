@@ -9,10 +9,9 @@ where
 
 import AST (AST (..), CurveExpr (epicycle), CurveState (..), EpicycleId, Expr (let_), SCurve, Stage (..), numberCurve)
 import AST.Instances ()
+import ContextualEmbeddings
 import Scene (VisualScene (..), evalScene, vsEpicycleOrder)
 import Text.Show (show)
-import Unembedding (runClose)
-import Unembedding.Env qualified as Ue
 
 -- | count the total number of AST nodes in a curve expression
 astNodeCount :: AST x env s -> Int
@@ -38,14 +37,14 @@ astLetCount (Let val body) = 1 + astLetCount val + astLetCount body
 
 data BenchScene = BenchScene
     { bsName :: Text
-    , bsTerm :: forall e. (CurveExpr e) => e SCurve
-    , bsState :: CurveState '[]
+    , bsTerm :: forall e env. (CurveExpr e) => e env SCurve
+    , bsState :: CurveState Empty
     , bsEpicycleIds :: NonEmpty EpicycleId
     }
 
 instance Show BenchScene where
     show (BenchScene name e state ids) =
-        let ast :: AST Parsed '[] SCurve = runClose e
+        let ast :: AST Parsed Empty SCurve = e
          in "BenchScene "
                 <> Text.Show.show name
                 <> "\n"
@@ -58,9 +57,9 @@ instance Show BenchScene where
                 <> "EpicycleIds: "
                 <> Text.Show.show ids
 
-mkBenchScene :: Text -> (forall e. (CurveExpr e) => e SCurve) -> BenchScene
+mkBenchScene :: Text -> (forall e env. (CurveExpr e) => e env SCurve) -> BenchScene
 mkBenchScene name term =
-    let cs = CurveState (numberCurve term) Ue.ENil
+    let cs = CurveState (numberCurve term) ENil
         scene = evalScene cs 0
      in BenchScene
             { bsName = name
@@ -70,28 +69,28 @@ mkBenchScene name term =
             }
 
 -- | baseline curve with nothing unusual
-curveSimple :: (CurveExpr e) => e SCurve
+curveSimple :: (CurveExpr e) => e env SCurve
 curveSimple =
     epicycle 120 1 0
         <> epicycle 60 3 0
         <> epicycle 30 5 0
 
 -- | curve with a shared variable
-curveNested :: (CurveExpr e, Expr e) => e SCurve
+curveNested :: (CurveExpr e, Expr e) => e env SCurve
 curveNested = let_ 40 $ \r ->
     epicycle r 1 0
         <> epicycle (r * 0.5) (-2) 0
         <> epicycle r 5 0
 
 -- | curve with a shared variable that appears in multiple types of parameter
-curveShared :: (CurveExpr e, Expr e) => e SCurve
+curveShared :: (CurveExpr e, Expr e) => e env SCurve
 curveShared = let_ 80 $ \rBase ->
     epicycle rBase 1 0
         <> epicycle (rBase * 0.45) (-5) (rBase * 0.02)
         <> epicycle (rBase * 0.15) 13 0
 
 -- | curve with parameters split into multiple literal sub-expressions, which creates multiple valid branches for the sns semantics
-curveAmbiguous :: (CurveExpr e) => e SCurve
+curveAmbiguous :: (CurveExpr e) => e env SCurve
 curveAmbiguous =
     epicycle (60 + 60) 1 0
         <> epicycle (20 * 3) 3 0
@@ -101,7 +100,7 @@ curveAmbiguous =
 {- | to examine how the semantics differ - sns is nondet, fusedm is left biased. so they should pick different updates for this one.
 both epicycles use both bindings, so updating either parameter creates an aliasing problem.
 -}
-curveLeftBias :: (CurveExpr e, Expr e) => e SCurve
+curveLeftBias :: (CurveExpr e, Expr e) => e env SCurve
 curveLeftBias =
     let_ 40 $ \x ->
         let_ 20 $ \y ->
@@ -109,7 +108,7 @@ curveLeftBias =
                 <> epicycle (x * y * 0.05) 3 0
 
 -- | deep sharing - 1 parameter shared across 5 epicycles
-curveDeepShared :: (CurveExpr e, Expr e) => e SCurve
+curveDeepShared :: (CurveExpr e, Expr e) => e env SCurve
 curveDeepShared = let_ 50 $ \r ->
     epicycle r 1 0
         <> epicycle (r * 0.5) 3 0
@@ -118,23 +117,23 @@ curveDeepShared = let_ 50 $ \r ->
         <> epicycle (r * 0.1) 11 0
 
 -- | The deterministic stability counterexample from the dissertations section `PutPut (Composability)'
-curveDualRecip :: (CurveExpr e, Expr e) => e SCurve
+curveDualRecip :: (CurveExpr e, Expr e) => e env SCurve
 curveDualRecip = let_ 0.1 $ \x ->
     let_ 0.05 $ \y ->
         epicycle (recip x + recip y) 1 0
 
 -- | additive aliasing - sns will often fail here because it tries to update both leaves individually
-curveAddAlias :: (CurveExpr e, Expr e) => e SCurve
+curveAddAlias :: (CurveExpr e, Expr e) => e env SCurve
 curveAddAlias = let_ 10 $ \r ->
     epicycle (r + r) 1 0
 
 -- | if we replace the r with a literal, the problem should resolve itself
-curveMulAlias :: (CurveExpr e, Expr e) => e SCurve
+curveMulAlias :: (CurveExpr e, Expr e) => e env SCurve
 curveMulAlias = let_ 10 $ \r ->
     epicycle (r * 2) 1 0
 
 -- | same as the additive alias, but worse
-curveSquareAlias :: (CurveExpr e, Expr e) => e SCurve
+curveSquareAlias :: (CurveExpr e, Expr e) => e env SCurve
 curveSquareAlias = let_ 10 $ \r ->
     epicycle (r * r) 1 0
 

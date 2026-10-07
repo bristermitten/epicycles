@@ -102,6 +102,7 @@ lightBlue = rgbColour 80 200 255 255
 -- | light background for the canvas
 canvasBackground :: Colour
 canvasBackground = rgbColour 232 231 231 255
+
 -- canvasBackground = rgbColour 18 24 31 250
 
 buttonActive :: Colour

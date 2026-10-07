@@ -13,9 +13,9 @@ where
 
 import AST (AST (..), ASTSort (SCurve, SNum), BindableNum, EpicycleId, EpicycleParam (..), EpicycleParamType, Stage (Numbered))
 
-
--- | a lens-like structure that lets us focus on a specific parameter of a specific epicycle in the curve's AST,
--- and rebuild the whole curve AST after updating that parameter
+{- | a lens-like structure that lets us focus on a specific parameter of a specific epicycle in the curve's AST,
+and rebuild the whole curve AST after updating that parameter
+-}
 data EpicycleParamLens param env = EpicycleParamLens
     { currentValue :: AST Numbered env (SNum (EpicycleParamType param))
     , rebuild :: EpicycleId -> AST Numbered env (SNum (EpicycleParamType param)) -> AST Numbered env SCurve

@@ -125,8 +125,7 @@ canvasAdjustedView state ce =
             (base.vtOffset + Vec (realToFrac panX) (realToFrac panY))
             (base.vtScale * state.appCanvasZoom)
 
-{- | construct the scene map, associating curve ids with their scenes and transforms
--}
+-- | construct the scene map, associating curve ids with their scenes and transforms
 pickableScenes :: AppState -> Map CurveId (ViewTransform, VisualScene)
 pickableScenes state =
     Map.mapMaybe
@@ -364,8 +363,6 @@ finishDrawing state screenPts =
             { appCurves = Map.insert nextId entry state.appCurves
             , appDrawing = Nothing
             }
-
-
 
 fullCanvasRegion :: (Int, Int) -> CanvasRegion
 fullCanvasRegion (winW, winH) =

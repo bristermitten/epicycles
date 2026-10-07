@@ -6,25 +6,10 @@ backwards update semantics
 module Update.SnS (module Update.SnS.Common, exprUpdate) where
 
 import AST
-import Unembedding.Env qualified as Ue
+import ContextualEmbeddings (Env (..), setIx)
 import Update.SnS.Common
 
-{- | apply the backwards update semantics to update the environment to try and reach a target value for an expression
-
-This is fully polymorphic over the numeric type via 'BindableNum'.  After the
-move from 'Double' to 'Rational' for radius/phase, several edge cases fall away
-automatically:
-
-  * The stability check uses 'approxEq', which for 'Rational' is exact '=='
-    — no more spurious failures from accumulated floating-point drift.
-
-  * 'safeDiv' for 'Rational' fails iff the divisor is zero, so 'U-Mul' and
-    'U-Recip' admit far more candidates than under 'Int' (which required
-    exact integer division).
-
-  * The 'isFinite' guards are no-ops for 'Rational' / 'Int' but kept for
-    'Double' to reject NaN / Infinity targets.
--}
+-- | apply the backwards update semantics to update the environment to try and reach a target value for an expression
 exprUpdate ::
     (DiffEnv env, BindableNum x) =>
     -- | the environment σ
@@ -44,7 +29,7 @@ exprUpdate env (Param_ p ix) target
     | isFinite target =
         [ UpdateResult
             (Param_ p ix)
-            (Ue.setIx ix (VNum target) env)
+            (setIx ix (VNum target) env)
         ]
     | otherwise = []
 -- U-Add[1/2]
@@ -88,12 +73,12 @@ exprUpdate env (Recip e) target =
 -- U-Let, which differs a bit from the paper
 exprUpdate sigma (Let e1 o) v' =
     let v1 = evalExpr sigma e1 -- sigma |- e_1 ⇓ v_1
-        extendedEnv = Ue.ECons (VNum v1) sigma -- sigma[x ↦ v_1]
+        extendedEnv = ECons (VNum v1) sigma -- sigma[x ↦ v_1]
      in do
             -- sigma[x ↦ v_1] |- o : τ ⇑ v' ↝ (sigma_outer[x ↦ v_1'], o')
             UpdateResult o' sigma_outer_ext <- exprUpdate extendedEnv o v'
             -- decompose sigma_outer to get v_1', the updated value for the bound variable
-            let Ue.ECons (VNum v_1') sigma_outer = sigma_outer_ext
+            let ECons (VNum v_1') sigma_outer = sigma_outer_ext
 
             -- sigma_outer |- e_1 : η ⇑ v_1' ↝ (sigma', e_1')
             UpdateResult e_1' sigma' <- exprUpdate sigma_outer e1 v_1'

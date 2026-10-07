@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 
-{- | Display-level curve representation: with details like positioning, scaling, and bounding boxes.
--}
+-- | Display-level curve representation: with details like positioning, scaling, and bounding boxes.
 module Curve (
     CurveDisplay (..),
     SomeCurveState (..),
@@ -16,13 +15,13 @@ where
 
 import AST (CurveExpr, CurveState (..), numberCurve)
 import AST qualified
+import ContextualEmbeddings (Env (..))
 import Data.List
 import Data.Set qualified as Set
 import Data.Vector.Unboxed as UV (toList)
 import GUI.Colour
 import Scene (evalScene)
 import Scene qualified
-import Unembedding.Env qualified as Ue
 import Update.SnS.Common
 import Vec (Vec (..))
 
@@ -48,15 +47,15 @@ mkCurveDisplay :: Vec -> Double -> Colour -> Bool -> SomeCurveState -> CurveDisp
 mkCurveDisplay offset scale color showCon state@(SomeCurveState cs) =
     CurveDisplay offset scale color showCon Set.empty state (sceneBoundingBox (evalScene cs 0))
 
-placeCurve :: Vec -> Colour -> Bool -> (forall e. (CurveExpr e) => e AST.SCurve) -> CurveDisplay
+placeCurve :: Vec -> Colour -> Bool -> (forall e env. (CurveExpr e) => e env AST.SCurve) -> CurveDisplay
 placeCurve = placeCurveScaled 1.0
 
-placeCurveScaled :: Double -> Vec -> Colour -> Bool -> (forall e. (CurveExpr e) => e AST.SCurve) -> CurveDisplay
+placeCurveScaled :: Double -> Vec -> Colour -> Bool -> (forall e env. (CurveExpr e) => e env AST.SCurve) -> CurveDisplay
 placeCurveScaled scale offset color showCon term =
-    mkCurveDisplay offset scale color showCon (SomeCurveState (CurveState (numberCurve term) Ue.ENil))
+    mkCurveDisplay offset scale color showCon (SomeCurveState (CurveState (numberCurve term) ENil))
 
 -- | Build a curve at the origin, which can be positioned later by 'positionCurve'
-makeCurve :: Colour -> Bool -> (forall e. (CurveExpr e) => e AST.SCurve) -> CurveDisplay
+makeCurve :: Colour -> Bool -> (forall e env. (CurveExpr e) => e env AST.SCurve) -> CurveDisplay
 makeCurve = placeCurveScaled 1.0 (Vec 0 0)
 
 positionCurve :: Vec -> CurveDisplay -> CurveDisplay
