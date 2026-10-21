@@ -12,8 +12,8 @@ module ContextualEmbeddings (
     lookEnv,
     setIx,
     ixToInt,
-    safeProxyTop,
-    ReifyIndex,
+    ProxyTop(..),
+    ReifyIndex(..),
 ) where
 
 type data Ctx k = Empty | Ctx k :/: k
@@ -30,15 +30,12 @@ data Ix (ctx :: Ctx k) (s :: k) where
     IxS :: Ix ctx s -> Ix (ctx :/: s') s
 
 deriving instance Show (Ix ctx s)
+deriving instance Eq (Ix ctx s)
 
 data ProxyTop (ctx :: Ctx k) (s :: k) where
     ProxyTop :: ProxyTop (ctx :/: s) s
+deriving instance Show (ProxyTop ctx t)
 
-{- | the index of the variable bound at @ctx :/: s@, as seen from the use-site context @use@
-slightly sneaky workaround to avoid needing to export 'ProxyTop', which is disallowed in the CE paper
--}
-safeProxyTop :: forall ctx s use. (ReifyIndex (ctx :/: s) use) => Ix use s
-safeProxyTop = reify (ProxyTop :: ProxyTop (ctx :/: s) s)
 
 class ReifyIndex bind use where reify :: ProxyTop bind s -> Ix use s
 

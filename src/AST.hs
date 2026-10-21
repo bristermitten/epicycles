@@ -30,10 +30,14 @@ module AST (
     EpicycleParamType,
     EpicycleParam (..),
     SEpicycleParam (..),
+    ASTCtx (..),
+    unembed,
+    contextualise,
 )
 where
 
 import ContextualEmbeddings
+import Data.Typeable (eqT, (:~:) (Refl))
 import GUI.Util (showFixed, showRational)
 import Pretty (PrettyCurve (pretty, prettyPrec), SyntaxHighlight (..), annotate)
 import Prettyprinter (Doc)
@@ -142,22 +146,6 @@ pattern Param ix = Param_ () ix
 
 {-# COMPLETE Lit, Param, Add, Mul, Recip, Epicycle, Append, Let #-}
 
-instance Expr (AST Parsed) where
-    lit = Lit
-    add = Add
-    mul = Mul
-    recip = Recip
-    let_ ::
-        forall env n a.
-        (Typeable n, BindableNum n) =>
-        AST Parsed env (SNum n) ->
-        ((forall use. (ReifyIndex (env :/: SNum n) use) => AST Parsed use (SNum n)) -> AST Parsed (env :/: SNum n) a) ->
-        AST Parsed env a
-    let_ v k = Let v (k (Param (safeProxyTop @env @(SNum n))))
-
-instance CurveExpr (AST Parsed) where
-    epicycle = Epicycle ()
-    cappend = Append
 
 -- | Data-less tag for a curve used for type safety in GADTs
 data Curve deriving (Show, Eq)
@@ -198,7 +186,7 @@ instance {-# INCOHERENT #-} (CurveExpr e) => Semigroup (e env SCurve) where
 
 numberCurve :: (forall e env. (CurveExpr e) => e env SCurve) -> AST Numbered Empty SCurve
 numberCurve term =
-    let ast :: AST Parsed Empty SCurve = term
+    let ast :: AST Parsed Empty SCurve = unembed (term @ASTCtx @Empty)
      in numberAST ast `evalState` EpicycleId 0
 
 evalExpr :: IEnv env -> AST phase env (SNum n) -> n
@@ -270,5 +258,82 @@ class (Expr e) => CurveExpr e where
 
 deriving instance (Show (XEpicycle x), Show (XParam s)) => Show (AST x env s)
 
+-- | hand-written since 'Let' binds an existential numeric type
+instance (Eq (XEpicycle x)) => Eq (AST x env s) where
+    Lit a == Lit b = a == b
+    Param_ _ i == Param_ _ j = i == j
+    Add a b == Add c d = a == c && b == d
+    Mul a b == Mul c d = a == c && b == d
+    Recip a == Recip b = a == b
+    Epicycle i r f p == Epicycle j r' f' p' = i == j && r == r' && f == f' && p == p'
+    Append a b == Append c d = a == c && b == d
+    Let (v1 :: AST x env n1) b1 == Let (v2 :: AST x env n2) b2 =
+        case eqT @n1 @n2 of
+            Just Refl -> v1 == v2 && b1 == b2
+            Nothing -> False
+    _ == _ = False
+
 -- | convenience type synonym for a show constraint on ASTs
 type ShowAST v = (forall sigma. Show (AST Numbered sigma v))
+
+data ASTCtx (env :: Ctx ASTSort) (s :: ASTSort) where
+    CLit :: (BindableNum n) => n -> ASTCtx env (SNum n)
+    CParam_ :: (ReifyIndex bind env) => XParam s -> ProxyTop bind s -> ASTCtx env s
+    CAdd :: (BindableNum n) => ASTCtx env (SNum n) -> ASTCtx env (SNum n) -> ASTCtx env (SNum n)
+    CMul :: (BindableNum n) => ASTCtx env (SNum n) -> ASTCtx env (SNum n) -> ASTCtx env (SNum n)
+    CRecip :: (BindableNum n, Fractional n) => ASTCtx env (SNum n) -> ASTCtx env (SNum n)
+    CEpicycle :: ASTCtx env (SNum Rational) -> ASTCtx env (SNum Int) -> ASTCtx env (SNum Rational) -> ASTCtx env SCurve
+    CAppend :: ASTCtx env SCurve -> ASTCtx env SCurve -> ASTCtx env SCurve
+    CLet ::
+        (Typeable n, BindableNum n) =>
+        ASTCtx env (SNum n) ->
+        (ProxyTop (env :/: SNum n) (SNum n) -> ASTCtx (env :/: SNum n) a) ->
+        ASTCtx env a
+
+instance Expr ASTCtx where
+    lit = CLit
+    add = CAdd
+    mul = CMul
+    recip = CRecip
+
+    {- HLINT ignore "Avoid lambda" -}
+    -- higher rank type
+    let_ v k = CLet v (\p -> k (CParam_ () p))
+
+instance CurveExpr ASTCtx where
+    epicycle = CEpicycle
+    cappend = CAppend
+
+unembed :: ASTCtx env s -> AST Parsed env s
+unembed (CLit n) = Lit n
+unembed (CParam_ x p) = Param_ x (reify p)
+unembed (CAdd a b) = Add (unembed a) (unembed b)
+unembed (CMul a b) = Mul (unembed a) (unembed b)
+unembed (CRecip a) = Recip (unembed a)
+unembed (CEpicycle r f p) = Epicycle () (unembed r) (unembed f) (unembed p)
+unembed (CAppend a b) = Append (unembed a) (unembed b)
+unembed (CLet v k) = Let (unembed v) (unembed (k ProxyTop))
+
+contextualise :: AST Parsed env s -> ASTCtx env s
+contextualise (Lit n) = CLit n
+contextualise (Param_ x ix) = case fromIndex ix of MkVar p -> CParam_ x p
+contextualise (Add a b) = CAdd (contextualise a) (contextualise b)
+contextualise (Mul a b) = CMul (contextualise a) (contextualise b)
+contextualise (Recip a) = CRecip (contextualise a)
+contextualise (Epicycle () r f p) = CEpicycle (contextualise r) (contextualise f) (contextualise p)
+contextualise (Append a b) = CAppend (contextualise a) (contextualise b)
+contextualise (Let v b) = CLet (contextualise v) (\_ -> contextualise b)
+
+-- copied mostly verbatim from STLC.hs in CE example code
+data Var ts' t = forall ts. (ReifyIndex ts ts') => MkVar (ProxyTop ts t)
+deriving instance Show (Var ts t)
+
+fromIndex :: Ix ts t -> Var ts t
+fromIndex IxZ = varTop
+  where
+    varTop :: forall t ts. Var (ts :/: t) t
+    varTop = MkVar (ProxyTop @ts @t)
+fromIndex (IxS i) = weakenCVar (fromIndex i)
+  where
+    weakenCVar :: Var ts t -> Var (ts :/: t1) t
+    weakenCVar (MkVar p) = MkVar p

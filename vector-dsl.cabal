@@ -110,6 +110,7 @@ test-suite vector-dsl-test
   ghc-options:        -threaded -rtsopts -with-rtsopts=-N
   other-modules:
     AmbiguityStressSpec
+    ContextualSpec
     ExprShapeSpec
     ExprUpdateSpec
     FuseDMSpec

@@ -7,7 +7,7 @@ module BenchMetrics (
 )
 where
 
-import AST (AST (..), CurveExpr (epicycle), CurveState (..), EpicycleId, Expr (let_), SCurve, Stage (..), numberCurve)
+import AST (AST (..), CurveExpr (epicycle), CurveState (..), EpicycleId, Expr (let_), SCurve, Stage (..), numberCurve, unembed)
 import AST.Instances ()
 import ContextualEmbeddings
 import Scene (VisualScene (..), evalScene, vsEpicycleOrder)
@@ -44,7 +44,7 @@ data BenchScene = BenchScene
 
 instance Show BenchScene where
     show (BenchScene name e state ids) =
-        let ast :: AST Parsed Empty SCurve = e
+        let ast :: AST Parsed Empty SCurve = unembed e
          in "BenchScene "
                 <> Text.Show.show name
                 <> "\n"
