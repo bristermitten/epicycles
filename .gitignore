@@ -10,3 +10,5 @@ scripts/bench_results.csv
 __pycache__/
 imgui.ini
 texput.log
+
+.vscode/
