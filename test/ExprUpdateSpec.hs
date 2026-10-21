@@ -74,30 +74,18 @@ prop_getPutClosed = property $ do
     checkAllResultsGetPut env expr current
 
 -- | checks GetPut for any 1 term expr
-prop_getPut1Term :: Property
-prop_getPut1Term = property $ do
-    v <- forAll genFinite
-    expr <- forAll genOneParamExpr
-    let env = env1 v
+prop_getPut :: Property
+prop_getPut = property $ do
+    (SomeExpr envLen expr) <- forAll genSomeExpr
+    env <- forAll $ genEnv genNonZero envLen
     let current = evalExpr env expr
     checkHasResults env expr current
     checkAllResultsGetPut env expr current
 
--- | checks GetPut for any 2 term expr
-prop_getPut2Term :: Property
-prop_getPut2Term = property $ do
-    v <- forAll genFinite
-    k <- forAll genNonZero
-    expr <- forAll genTwoParamExpr
-    let env = env2 v k
-    let current = evalExpr env expr
-    checkHasResults env expr current
-    checkAllResultsGetPut env expr current
 
 -- | checks PutGet for any closed expression and finite target
 prop_putGet :: Property
 prop_putGet = property $ do
-    v <- forAll genFinite
     target <- forAll genFinite
     expr <- forAll genClosedExpr
     checkAllResultsGetPut ENil expr target
@@ -132,25 +120,9 @@ prop_recipRoundTrip = property $ do
 -}
 prop_arbitraryParamTerminates :: Property
 prop_arbitraryParamTerminates = property $ do
-    expr <- forAll genOneParamExpr
-    v <- forAll genNonZero
-    let env = env1 v
-        current = evalExpr env expr
-    if not (isFinite current)
-        then H.success
-        else do
-            target <- forAll genFinite
-            let results = exprUpdate env expr target
-            for_ results $ \result -> do
-                let actual = evalExpr result.updatedEnv result.updatedExpr
-                H.assert (isFinite actual)
-
-prop_arbitraryTwoParamTerminates :: Property
-prop_arbitraryTwoParamTerminates = property $ do
-    expr <- forAll genTwoParamExpr
-    v <- forAll genNonZero
-    k <- forAll genNonZero
-    let env = env2 v k
+    (SomeExpr envLen expr) <- forAll genSomeExpr
+    env <- forAll $ genEnv genNonZero envLen
+    let
         current = evalExpr env expr
     if not (isFinite current)
         then H.success

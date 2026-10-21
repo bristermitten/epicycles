@@ -8,7 +8,7 @@ however there is no proof of this in the type system, and so this serves as an e
 module ExprShapeSpec (spec) where
 
 import AST
-import Gen (genClosedExpr)
+import Gen
 import Hedgehog (Property, discover, forAll, property, (===))
 import Hedgehog qualified as H
 import Test.Syd
