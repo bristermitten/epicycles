@@ -86,12 +86,45 @@
               natbib
               cleveref
               newunicodechar
+              latexmk
+              simplebnf
+              algorithm2e
+              adjustbox
               ;
+          };
+
+          dissertation = pkgs.stdenvNoCC.mkDerivation {
+            pname = "epicycles-dissertation";
+            version = "0.1";
+            src = ./writing;
+
+            nativeBuildInputs = [
+              texEnv
+              pkgs.python3Packages.pygments # needed by minted
+              pkgs.cm_unicode
+            ];
+
+            OSFONTDIR = "${pkgs.cm_unicode}/share/fonts/opentype//";
+
+            buildPhase = ''
+              runHook preBuild
+              export HOME=$TMPDIR
+              export TEXMFVAR=$TMPDIR/texmf-var
+              latexmk -xelatex -shell-escape -interaction=nonstopmode -halt-on-error DissertationTemplate.tex
+              runHook postBuild
+            '';
+
+            installPhase = ''
+              runHook preInstall
+              install -Dm644 DissertationTemplate.pdf $out/dissertation.pdf
+              runHook postInstall
+            '';
           };
 
         in
         {
           packages.default = project;
+          packages.dissertation = dissertation;
 
           devShells.default = hp.shellFor {
             packages = p: [ project ];
